@@ -1,11 +1,11 @@
 ---
-title: "Proposal title"
+title: "Book Recommendation System"
 subtitle: "Proposal"
 author: 
-  - name: "Team Name - Team member 1, Team member 2,..."
+  - name: "Colleen Shay Feaman"
     affiliations:
       - name: "College of Information Science, University of Arizona"
-description: "Project description"
+description: "Content-based and rating-aware book recommendations using public metadata and user history."
 format:
   html:
     code-tools: true
@@ -23,23 +23,85 @@ jupyter: python3
 #| label: load-pkgs
 #| message: false
 import numpy as np
+import pandas as pd
 ```
 
-## Dataset
+## High Level Goal
+Build a book recommendation system that finds similar books using metadata (author, generes, subgenres, description/keywords) and optionally adjust suggestions using the reader's ratings (e.g., down-weight authors/genres from 1 star books).
+
+## Expanded Description
+I am an avid reader that uses platforms, like Goodreads, to find new books. Any reader knows the frustration of finishing an amazing book and entering the dreaded "slump" of not knowing what good book to pick up next. Most recommendations provided by apps like Goodreads, push overly popular titles rather than personalized suggestions.
+
+I want to create a transparent, content-based model that recommends books using metadata with an optional rating-based adjustment so the system can learn from reader preferences. For example, if a user consistently gives low ratings to books from a particular author or sub-genre, the model will avoid similar recomendations in the future. I want the focus of this system to be on content similarity over popularity.
+
+## Datasets
+
+This dataset contains rich metadata about books from the Goodreads list "Books That Everyone Should Read At Least Once". It includes 10,000 books and each book has the author, description, genres, average rating, number of ratings, and a URL link to the book page on Goodreads. 
 
 ```{python}
-#| label: load-dataset
+#| label: load-dataset1
 #| message: false
+#| output: true
+
+goodreads = pd.read_csv("data/goodreads_data.csv")
+
+goodreads.head()
 ```
 
-A brief description of your dataset including its provenance, dimensions, etc. as well as the reason why you chose this dataset.
+This dataset consists of three CSV's that contain user-book ratings. This data will be used to recommend new books to the user based on their reading history.
+```{python}
+#| label: load-dataset2
+#| message: false
+#| output: true
 
-Make sure to load the data and use inline code for some of this information.
+import pandas as pd
 
-## Questions
+books_path = "data/user_data/Books.csv"
+ratings_path = "data/user_data/Ratings.csv"
+users_path = "data/user_data/Users.csv"
 
-The two questions you want to answer.
+books = pd.read_csv(books_path, sep=";", encoding="latin-1", on_bad_lines="skip")
+ratings = pd.read_csv(ratings_path, sep=";", encoding="latin-1", on_bad_lines="skip")
+users = pd.read_csv(users_path, sep=";", encoding="latin-1", on_bad_lines="skip")
 
-## Analysis plan
+print("Books:", books.shape)
+print("Ratings:", ratings.shape)
+print("Users:", users.shape)
+```
 
--   A plan for answering each of the questions including the variables involved, variables to be created (if any), external data to be merged in (if any).
+## Repo Organization
+``` {python}
+#| label: repo-org
+#| message: false
+
+Final-Project-Colleen-Feaman-Solo/
+_extra/ #Reuseable code, extra notes
+_freeze/ #Quarto cache + rendered outputs
+.github/ #Github actions and issue templates
+data/ #All datasets fro analysis
+images/ #visual assets used in docs & site
+_quarto.yml #site configuration
+about.qmd #Project overview page
+index.qmd #Landing page for the Quarto site
+presentation.qmd #Final project presentation slides
+project-final.Rproj #RStudio project file
+proposal.qmd #Final proposal doc
+README.md #Project overview and structure
+requirements.txt #Package requirements
+```
+
+This repository follows a structured layout with dedicated folder for data, analysis, and rendered output. Each primary folder includes a README.md to describe the contents and purpose of the folder.
+
+## Plan of Attack
+
+Week of Nov 3: Use peer review feedback to revise proposal and submit for instructor review
+
+Week of Nov 10: Use intstructor feedback for a secondary revision of proposal
+
+Week of Nov 17: Load and clean data, complete EDA
+
+Week of Nov 24: Complete feature engineering & model building
+
+Week of Dec 01: Refine model, tune hyperparameters, add evaluation metrics
+
+Week of Dec 08: Finalize slides, polish everything up, and write report

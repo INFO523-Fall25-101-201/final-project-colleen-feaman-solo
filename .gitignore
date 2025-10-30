@@ -4,3 +4,10 @@
 .Ruserdata
 
 /.quarto/
+_site/
+_freeze/
+*.html
+*.json
+*.png
+
+
