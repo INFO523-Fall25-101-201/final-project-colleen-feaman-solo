@@ -83,9 +83,9 @@ Final-Project-Colleen-Feaman-Solo/
 _extra/ #Reuseable code, extra notes
 _freeze/ #Quarto cache + rendered outputs
 .github/ #Github actions and issue templates
-data/ #All datasets fro analysis
-images/ #visual assets used in docs & site
-_quarto.yml #site configuration
+data/ #All datasets for analysis
+images/ #Visuals used in docs & site
+_quarto.yml #Site configuration
 about.qmd #Project overview page
 index.qmd #Landing page for the Quarto site
 presentation.qmd #Final project presentation slides
