@@ -1,7 +1,7 @@
 ---
-title: "Project title"
-subtitle: "INFO 523 - Summer 2025 - Final Project"
-author: "Author names"
+title: "Book Recommendation System"
+subtitle: "INFO 523 - Fall 2025 - Final Project"
+author: "Colleen Feaman"
 title-slide-attributes:
   data-background-image: images/watercolour_sys02_img34_teacup-ocean.jpg
   data-background-size: stretch
@@ -45,39 +45,132 @@ plt.rcParams['figure.figsize'] = (6, 6 * 0.618)
 #| label: load-data
 #| include: false
 # Load data in Python
-mtcars = sns.load_dataset('mpg').dropna()  # mtcars dataset is similar to the mpg dataset from seaborn
-mtcars['speed'] = mtcars['horsepower'] / mtcars['weight']
-
-penguins = sns.load_dataset('penguins').dropna()
+books = pd.read_csv("../data/user_data/Books.csv", low_memory=False)
+ratings = pd.read_csv("../data/user_data/Ratings.csv")
 ```
 
-# Using Quarto for presentations
+## Project Overview
 
-## Quarto
+Goal: Build a hybrid book recommendation system that combines:
 
--   The presentation is created using the Quarto CLI
+-   Content- Based Filtering (TF_IDF)
 
--   `##` sets the start of a new slide
+-   Collaborative Filtering (item-based KNN)
 
-## Layouts
+-   Hybrid Scoring (weighed combination
 
-You can use plain text
+Motivation: Give readers recommendations based on what they like to read
 
-::: columns
-::: {.column width="40%"}
--   or bullet points[^1]
-:::
+-   Similar books
 
-::: {.column width="60%"}
-or in two columns
-:::
-:::
+-   Rating patterns
 
-[^1]: And add footnotes
+## Data Sources
 
--   like
+1.  Books Metadata
+    -   Title
+    -   Author
+    -   Publisher
+2.  Ratings
+    -   Implicit 1-10 ratings
+    -   ISBN
+    -   User ID
 
--   this
+## Data Cleaning
+
+Books
+
+-   Removed duplicate ISBN's
+
+-   Normalized text (lowercase, strip, fill missing)
+
+-   Constrained publication year
+
+-   Dropped ISBNs with no metadata
+
+Ratings
+
+-   Removed zeros (viewed page, not rated)
+
+-   Kept on books that exist in the Books data
+
+-   Filtered low-activity users/books
+
+## Content-Based Model (TF_IDF)
+
+```{python}
+Book_Title + Book_Author + Publisher
+```
+
+-   Max features = 20,000
+
+-   ngram_range = (1,2)
+
+-   stop_words = "english"
+
+-   strip_accents = "unicode"
+
+-   min_df = 2
+
+Sparse matrix:
+
+147,100 x 20,000
+
+## Content Similarity: Example Output
+
+*plot*
+
+## Collarboative Filtering (Surprise KNN basic)
+
+Surprise library:
+
+-   built for recommender systems
+
+-   handles sparse ratings efficiently
+
+-   Auto maps raw IDs to internal integer IDs
+
+Model Specification:
+
+-   Item-based similarity
+
+-   Cosine distance
+
+-   KNNBasic
+
+-   Trained on full dataset
+
+## Collaborative Filtering Recommendation Example
+
+*plot*
+
+## Hybrid Model
+
+*Formula*
+
+Default: a=0.6 (content weighted slightly more)
+
+Ensures results when:
+
+-   a book has a sparse rating history (CF weak)
+
+-   Metadata alone isnt enough (content weak
+
+Output
+
+-   Top-N combines recommendations ranked by hybrid score
+
+## Hybrid Recommendation Example
+
+*plot*
+
+## Evaluation
+
+## Key Findings
+
+## Limitations 
+
+## Conslusions 
 
 ## Code
 
@@ -108,7 +201,7 @@ plt.show()
 
 ## Plot and text
 
-::: columns
+::::: columns
 ::: {.column width="50%"}
 -   Some text
 
@@ -124,7 +217,7 @@ sns.boxplot(data=penguins, x='bill_length_mm', y='species', hue='species', ax=ax
 plt.show()
 ```
 :::
-:::
+:::::
 
 # A new section...
 
