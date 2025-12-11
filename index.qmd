@@ -5,7 +5,7 @@ author:
   - name: "Colleen Feaman"
     affiliations:
       - name: "College of Information Science, University of Arizona"
-description: "Content-based and rating-aware book recommendations using public metadata and user history."
+description: "A hybrid book recommendation system that combines a content-based and collaborative filter model using publicly availble book metadata and user reading history."
 format:
    html:
     code-tools: true
@@ -21,3 +21,525 @@ jupyter: python3
 ## Abstract
 
 This project builds a hybrid recommendation system that combines content text-based metadata and user rating patterns to generate reading suggestions.
+
+<details>
+
+<summary><strong>Click to view full code</strong></summary>
+
+```{python}
+#| eval: false
+#| echo: true
+
+# # The system
+
+# %%
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.sparse import csr_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from surprise import Dataset, Reader, KNNBasic
+
+
+# %% [markdown]
+# ## Part 1: Data Exploration and Preprocessing
+# ### Including: Data Retrieval, Exploratory Data Analysis (EDA), Data Cleaning, & Feature Engineering
+
+# %%
+books = pd.read_csv("data/user_data/Books.csv", low_memory=False)
+ratings = pd.read_csv("data/user_data/Ratings.csv")
+
+# %%
+books.head()
+
+# %%
+books.info()
+
+# %%
+ratings.head()
+
+# %%
+ratings.info()
+
+# %%
+print("Books:", books.shape)
+print("Ratings:", ratings.shape)
+
+# %% [markdown]
+# #### Clean the Books.csv dataset
+
+# %%
+#Fix column names
+
+books.columns = books.columns.str.replace("-","_").str.replace(" ", "_")
+
+# %%
+#Remove invalid publication years
+
+before = books.shape[0]
+
+books['Year_Of_Publication'] = pd.to_numeric(books['Year_Of_Publication'], errors='coerce')
+books = books[(books['Year_Of_Publication'] >=1800) & (books['Year_Of_Publication']<= 2025)]
+
+after = books.shape[0]
+
+print(f"Rows removed: {before-after}")
+
+# %%
+#Normalize book author and book titles
+
+books['Book_Author'] = books['Book_Author'].str.strip().str.title()
+books['Book_Title'] = books['Book_Title'].str.strip().str.title()
+
+# %%
+books.head()
+
+# %%
+books.info()
+
+# %%
+books[books['Book_Author'].isna()]
+
+
+# %%
+#Dropping those two rows because they do not matter
+
+books = books.dropna(subset=["Book_Author"])
+
+# %%
+books[books['Publisher'].isna()]
+
+# %%
+#Also dropping those two rows because they do not matter
+
+books = books.dropna(subset=["Publisher"])
+
+# %%
+books.info()
+
+#Im happy with that, let's move on
+
+# %% [markdown]
+# #### Cleaning the Ratings.csv dataset
+
+# %%
+#Looking at the distribution of ratings
+
+ratings['Book-Rating'].value_counts().sort_index()
+
+# %%
+#Dropping rows with rating = 0
+#Those are instances where users clicked or viewed on the book but did not give a rating.
+#Keeping the zeros will distort the algorithm 
+
+#The dataset will still have ~400k+ ratings amount ~100k users that cover ~100k books
+
+ratings['Book-Rating'] = pd.to_numeric(ratings['Book-Rating'], errors='coerce')
+ratings = ratings[ratings['Book-Rating'] >0]
+
+# %%
+ratings['Book-Rating'].value_counts().sort_index()
+
+# %%
+ratings.info()
+
+# %%
+#Fix column names
+
+ratings.columns = ratings.columns.str.replace("-","_").str.replace(" ", "_")
+
+# %%
+ratings.head()
+
+# %% [markdown]
+# ### Moving on to EDA
+
+# %%
+print("Books:", books.shape)
+print("Ratings:", ratings.shape)
+
+# %%
+#Checking Publication Date for Outliers
+
+books['Year_Of_Publication'].hist(bins=40, figsize=(8,4))
+
+# %%
+#As expected, there are outliers.
+#Getting rid of rows with books published before 1950 for relevancy
+
+books['Year_Of_Publication']= books['Year_Of_Publication'].clip(lower=1950,upper=2024)
+
+# %%
+books['Year_Of_Publication'].hist(bins=40, figsize=(8,4))
+
+#Looks much better
+
+# %%
+#Top 10 authors
+
+books['Book_Author'].value_counts().head(10)
+
+# %%
+#Top 10 Publishers
+
+books['Publisher'].value_counts().head(10)
+
+# %%
+#Plot for distribution of Ratings
+
+rating_counts = ratings['Book_Rating'].value_counts().sort_index()
+
+plt.figure(figsize=(8,4))
+sns.barplot(x=rating_counts.index, y=rating_counts.values)
+plt.xlabel("Rating")
+plt.ylabel("Count")
+plt.title("Distribution of Ratings")
+plt.show()
+
+# %%
+#Number of ratings per user
+
+ratings['User_ID'].value_counts().describe()
+
+#This is highly skewed
+
+# %%
+#I am worried the users that have contributed thousands of rankings will give bias to the model
+
+ratings['User_ID'].value_counts().head(10)
+
+#However, the system will be able to give better matches to users with more ratings
+#Keeping them for now
+
+# %%
+#Ratings per book
+
+ratings['ISBN'].value_counts().describe()
+
+#While 707 ratings for one book is an outlier, it is not an error
+#More popular books will have more rating
+
+# %%
+#Checking that all ISBNs in the ratings data also exists in the books data
+
+missing_books = ~ratings['ISBN'].isin(books['ISBN'])
+missing_books.sum()
+
+#55,643 ratings reference ISBNs that are not in the books data
+#This a problem for when I merge the data, as the ISBNs not in the books data will not have any metadata
+
+# %%
+#Removing the ratings with ISBN's that are not in the books data
+
+ratings_clean = ratings[ratings['ISBN'].isin(books['ISBN'])]
+
+# %%
+#Now books and ratings data are ready to merge
+
+ratings_merged = ratings_clean.merge(
+    books,
+    on='ISBN',
+    how='inner'
+)
+
+ratings_merged.head()
+
+# %%
+print("Ratings Merged:", ratings_merged.shape)
+
+ratings_merged.info()
+
+# %%
+#Removing duplicate ratings as a sanity check
+
+ratings_merged.drop_duplicates(['User_ID', 'ISBN'], keep='first', inplace=True)
+
+ratings_merged.info()
+
+#There were none
+
+# %%
+#Filter books with enough ratings
+#The CF KNN model will perform better
+
+book_counts = ratings_merged['ISBN'].value_counts()
+valid_books = book_counts[book_counts >= 5].index
+
+ratings_filt = ratings_merged[ratings_merged['ISBN'].isin(valid_books)]
+
+# %%
+#Filter users with enough ratings
+#Again, the CF KNN model will perform better
+
+user_counts = ratings_filt['User_ID'].value_counts()
+valid_users = user_counts[user_counts >= 5].index
+
+ratings_filt= ratings_filt[ratings_filt['User_ID'].isin(valid_users)]
+
+# %% [markdown]
+# #### Create Modeling Matrices
+
+# %%
+#User-Item Rating Matrix
+#For Collaborative Filtering
+
+user_ids_f = ratings_filt['User_ID'].astype('category').cat.codes
+book_ids_f = ratings_filt['ISBN'].astype('category').cat.codes
+ratings_vals_f = ratings_filt['Book_Rating'].astype(float).values
+
+user_item_sparse_f = csr_matrix(
+    (ratings_vals_f, (user_ids_f, book_ids_f))
+)
+
+user_item_sparse_f
+
+# %%
+#Checking sparsity
+
+print("shape:", user_item_sparse_f.shape)
+print("nonzero entries:", user_item_sparse_f.count_nonzero())
+print("sparsity:", 1 - (user_item_sparse_f.count_nonzero()/ np.prod(user_item_sparse_f.shape)))
+
+# %%
+#Build an indexed version of books
+
+isbn_filt = ratings_filt['ISBN'].unique()
+
+books_indexed = books.drop_duplicates('ISBN').set_index('ISBN')
+
+books_indexed.head()
+
+# %%
+#Select only books used in ratings
+#Return ISBN as a column
+
+books_for_model = books_indexed.loc[isbn_categories].reset_index().rename(columns={'index':'ISBN'})
+
+books_for_model['Book_Title'] = books_for_model['Book_Title'].fillna('')
+books_for_model['Book_Author'] = books_for_model['Book_Author'].fillna('')
+books_for_model['Publisher'] = books_for_model['Publisher'].fillna('')
+
+books_for_model['text'] =(
+    books_for_model['Book_Title'] +''+
+    books_for_model['Book_Author'] +''+
+    books_for_model['Publisher']
+)
+
+books_for_model[['ISBN', 'text']].head()
+
+# %%
+#Build TF-IDF Matrix
+#Limiting vocab size to prevent memory explosion
+
+tfidf = TfidfVectorizer(
+    max_features=20000,
+    stop_words='english',
+    ngram_range=(1,2),
+    min_df=2,
+    strip_accents='unicode'
+)
+
+tfidf_matrix = tfidf.fit_transform(books_for_model['text'])
+
+tfidf_matrix.shape
+
+# %% [markdown]
+# ## Part 2: Built the Recommendation System
+
+# %% [markdown]
+# #### Build the Content-Based Recommender
+
+# %%
+#Creating an easy way to find ISBN to row index
+
+isbn_to_index = pd.Series(books_for_model.index, index=books_for_model['ISBN'])
+
+# %%
+#Inspect top TF-IDF term
+
+feature_names = tfidf.get_feature_names_out()
+
+term_weights = tfidf_matrix.sum(axis=0).A1
+
+N = 20 
+top_idx = term_weights.argsort()[::-1][:N]
+
+top_terms = [(feature_names[i], term_weights[i]) for i in top_idx]
+
+top_terms
+
+# %%
+#Recommender function 
+
+def recommend_content(isbn, top_n=10):
+    idx = isbn_to_index [isbn]
+    
+    book_vec = tfidf_matrix[idx]
+    
+    sims = cosine_similarity(book_vec, tfidf_matrix).flatten()
+    
+    similar_idx = sims.argsort()[::-1][1:top_n+1]
+    
+    results = books_for_model.iloc[similar_idx][['ISBN', 'Book_Title', 'Book_Author']].copy()
+
+    results['similarity'] = sims[similar_idx]
+    
+    return results.reset_index(drop=True)
+
+# %%
+#Test the recommender
+
+sample_isbn = books_for_model['ISBN'].iloc[0]
+recommend_content(sample_isbn)
+
+# %% [markdown]
+# #### Collaborative Filtering Model
+
+# %%
+#Using surprise library
+#It was specifically built for CF recommender systems
+
+reader = Reader(rating_scale=(1,10))
+
+data = Dataset.load_from_df(
+    ratings_filt[['User_ID', 'ISBN', 'Book_Rating']],
+    reader
+)
+
+trainset = data.build_full_trainset()
+
+# %%
+#Train an item-based cosine KNN model
+
+sim_options = {
+    'name': 'cosine',
+    'user_based': False
+}
+
+algo = KNNBasic(sim_options= sim_options)
+trainset = data.build_full_trainset()
+algo.fit(trainset)
+
+# %%
+#Create mapping of ISBN to surprise internal ID
+
+surprise_isbns = {trainset.to_raw_iid(iid) for iid in trainset.all_items()}
+
+isbn_to_inner = {
+    raw: trainset.to_inner_iid(raw)
+    for raw in surprise_isbns
+}
+
+# %%
+#Recommendation function
+#Given an ISBN -> recommend similar books -> based on user rating patterns
+
+def recommend_cf(isbn, top_n =10):
+    if isbn not in isbn_to_inner:
+        return f"ISBN {isbn} has no user ratings"
+    
+    inner_id = isbn_to_inner[isbn]
+
+    neighbors_inner = algo.get_neighbors(inner_id, k=top_n)
+
+    neighbor_isbns = [trainset.to_raw_iid(n) for n in neighbors_inner]
+
+    recs = books_indexed.loc[neighbor_isbns][['Book_Title', 'Book_Author']].copy()
+    recs = recs.reset_index().rename(columns={'index': 'ISBN'})
+   
+    return recs
+
+# %%
+#Test the CF Model
+
+sample_isbn = ratings_filt['ISBN'].iloc[0]
+recommend_cf(sample_isbn)
+
+# %%
+#Double checking CF model
+
+sample = ratings_filt['ISBN'].sample(1).iloc[0]
+recommend_cf(sample)
+
+# %% [markdown]
+# #### Build Hybrid Recommender
+# Combination of:
+# 
+# Content-based similarity - TF-IDF + Author + publisher
+# 
+# Collaborative filtering similarity - Surprise item-item cosine
+
+# %%
+#Get content similarity for a single ISBN
+
+def get_content_similarities(isbn):
+    if isbn not in isbn_to_index.index:
+        return None
+    
+    idx = isbn_to_index[isbn]
+
+    book_vec = tfidf_matrix[idx]
+
+    sims = cosine_similarity(book_vec, tfidf_matrix).flatten()
+    return sims
+
+# %%
+#Get CF similarity vector for the same ISBN
+
+def get_cf_similarities(isbn, top_k=50):
+    if isbn not in isbn_to_inner:
+        return None
+    
+    inner_id = isbn_to_inner[isbn]
+
+    neighbors_inner = algo.get_neighbors(inner_id, k=top_k)
+
+    sim_vector = np.zeros(len(books_for_model), dtype=float)
+
+    for n in neighbors_inner:
+        sim = algo.sim[inner_id, n]
+        raw_isbn = trainset.to_raw_iid(n)
+    
+        if raw_isbn in isbn_to_index.index:
+            idx = isbn_to_index[raw_isbn]
+            sim_vector[idx] = sim
+
+    return sim_vector
+
+# %%
+#Hybrid Function
+
+def recommend_hybrid(isbn, top_n=10, alpha=0.6):
+    content_sims = get_content_similarities(isbn)
+    cf_sims = get_cf_similarities(isbn)
+
+    if content_sims is None and cf_sims is None:
+        return f"{isbn} has no similarity data"
+    
+    if content_sims is None:
+        content_sims = np.zeros(len(books_for_model))
+    if cf_sims is None:
+        cf_sims = np.zeros(len(books_for_model))
+
+    hybrid_sims = alpha * content_sims + (1- alpha) * cf_sims
+
+    if isbn in isbn_to_index.index:
+        hybrid_sims[isbn_to_index[isbn]] = 0
+
+    top_idx = hybrid_sims.argsort()[::-1][1: top_n +1]
+
+    results = books_for_model.iloc[top_idx][['ISBN', 'Book_Title', 'Book_Author']].copy()
+    results['hybrid_score'] = hybrid_sims[top_idx]
+
+    return results.reset_index(drop=True)
+
+# %%
+#Test the hybrid model
+
+sample_isbn = ratings_filt['ISBN'].iloc[0]
+recommend_hybrid(sample_isbn, top_n=10, alpha=0.6)
+```
+
+</details>
