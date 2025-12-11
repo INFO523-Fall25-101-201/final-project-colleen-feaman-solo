@@ -56,13 +56,8 @@ The datasets used in this project were downloaded from [Kaggle.](https://www.kag
 ### Data Cleaning
 
 -   Standardized column names for both datasets so that they were compatible with Pandas and a clean schema makes a pipeline reproducible.
-
-<!-- -->
-
--   For `books.csv`, I removed invalid publication years, rows with missing values for `Book_Author` and `Publisher`, any books published by Scholastic (kids books), and known foreign-language publishers. I was not able to interpret the quality of recommendations when all the book titles were in German.
-
+-   For `books.csv`, I removed invalid publication years, rows with missing values for `Book_Author` and `Publisher`, any books published by Scholastic or Random House Books for Young Readers (kids books), and known foreign-language publishers. I was not able to interpret the quality of recommendations when all the book titles were in German.
 -   Normalized text fields in `books.csv` which improves TF-IDF tokenization and avoids reading "harry potter" as a different book than "Harry Potter".
-
 -   For `ratings.csv` , I removed any ratings set at 0. These were instances where users clicked or viewed the book but not actually leave a rating. Keeping these rows would have distorted the algorithm.
 
 ### Exploratory Data Analysis (EDA)
@@ -115,6 +110,7 @@ The full code is the `allwork.ipynb` file under the `work` folder.
 #| eval: false
 #| echo: true
 
+# %% [markdown]
 # # The system
 
 # %%
@@ -229,8 +225,12 @@ print(f"Rows removed: {before-after}")
 # %%
 #Removing Scholastic publisher since that is kids books
 
+kids_books_publishers = [
+    "Scholastic", "Random House Books for Young Readers"
+]
+
 books = books[
-    ~books['Publisher'].str.contains("Scholastic", case=False, na=False)]
+    ~books['Publisher'].str.contains("|".join(kids_books_publishers), case=False, na=False)]
 
 # %%
 books.info()
@@ -696,6 +696,7 @@ isbn = row['ISBN']
 user_rating = row['Book_Rating']
 
 show_hybrid_recs_user(isbn, user_id, top_n=10, alpha=0.6)
+
 ```
 
 </details>

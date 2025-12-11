@@ -32,6 +32,7 @@ The overall goal of this project is to demonstrate how balancing metadata and re
 #| eval: false
 #| echo: true
 
+# %% [markdown]
 # # The system
 
 # %%
@@ -146,8 +147,12 @@ print(f"Rows removed: {before-after}")
 # %%
 #Removing Scholastic publisher since that is kids books
 
+kids_books_publishers = [
+    "Scholastic", "Random House Books for Young Readers"
+]
+
 books = books[
-    ~books['Publisher'].str.contains("Scholastic", case=False, na=False)]
+    ~books['Publisher'].str.contains("|".join(kids_books_publishers), case=False, na=False)]
 
 # %%
 books.info()
@@ -613,6 +618,7 @@ isbn = row['ISBN']
 user_rating = row['Book_Rating']
 
 show_hybrid_recs_user(isbn, user_id, top_n=10, alpha=0.6)
+
 ```
 
 </details>
