@@ -15,7 +15,7 @@ jupyter: python3
 
 # Final Project Write-Up
 
-\*Note for peer review & Dr. Chen that the proposal template I followed did not include "asking a question". So, that was not part of my project goal.
+~\*Note\ for\ peer\ review\ &\ Dr.\ Chen\ that\ the\ proposal\ template\ I\ followed\ did\ not\ include\ "asking\ a\ question".\ So,\ that\ was\ not\ part\ of\ my\ project\ goal.~
 
 ## Introduction
 
@@ -25,18 +25,37 @@ This write-up explains the decisions made to improve data quality, interpretabil
 
 ## Datasets
 
-The datasets used in this project were downloaded from Kaggle.
+The datasets used in this project were downloaded from [Kaggle.](https://www.kaggle.com/datasets/arashnic/book-recommendation-dataset/data)
 
-Books.csv i Column Description\
---- ------ ------------------------------ 0 ISBN unique identifier for each book 1 Book-Title title of the book 2 Book-Author author of the book 3 Year-Of-Publication year the book was published 4 Publisher company that published the book 5 Image-URL-S URL to a small cover image 6 Image-URL-M URL to a medium cover image 7 Image-URL-L URL to a large cover image
+#### Books.csv
 
-Ratings.csv i Column Description --- ------ ------------------- 0 User-ID annonymous unique id for each user 1 ISBN unique identifier for each book 2 Book-Rating rating given to book from User_ID
+`ISBN` - unique identifier of each book
 
-Link to datasets: https://www.kaggle.com/datasets/arashnic/book-recommendation-dataset/data
+`Book-Title` - title of the book
+
+`Book-Author` - author of the book
+
+`Year-Of-Publication` - year the book was published
+
+`Publisher` - company that published the book
+
+`Image-URL-S` - URL to a small cover image
+
+`Image-URL-M` - URL to a medium cover image
+
+`Image-URL-L` - URL to a large cover image
+
+#### Ratings.csv:
+
+`User-ID - anonymous` unique id for each user
+
+`ISBN` - unique identifier for each book
+
+`Book-Rating` - rating given to book from User_ID
 
 ## Approach and Mining Methods
 
-#### Data Cleaning
+### Data Cleaning
 
 -   Standardized column names for both datasets so that they were compatible with Pandas and a clean schema makes a pipeline reproducible.
 
@@ -48,7 +67,7 @@ Link to datasets: https://www.kaggle.com/datasets/arashnic/book-recommendation-d
 
 -   For `ratings.csv` , I removed any ratings set at 0. These were instances where users clicked or viewed the book but not actually leave a rating. Keeping these rows would have distorted the algorithm.
 
-#### Exploratory Data Analysis (EDA)
+### Exploratory Data Analysis (EDA)
 
 -   Found outliers in `Year_Of_Publication`. Removed any books published before 1950 so all books were mostly relevant.
 
@@ -58,19 +77,39 @@ Link to datasets: https://www.kaggle.com/datasets/arashnic/book-recommendation-d
 
 -   Merged the two datasets using `ISBN`. Removed any duplicates. Filtered out any users or books with less than 5 ratings because CF models cannot learn meaningful user-item relationships with sparse behavior.
 
-#### Modeling Decisions
+### Modeling Decisions
 
-\- Computed matrices only from books present in the ratings Part 2: Build the Recommendation System 3. Created CBF Model - Combined title + author + publisher into a “text” field - Tokenized using TfidVectorizer - Computed cosine similarity for any selected ISBN 4. Created CF Model - Built full trainset - Used KNNBasic (item-based, cosine) - Extracted neighbor ISBNs for any given book 5. Created Hybrid Model - Normalized similarity vectors - Weighted the contributions of CBF and CF - Returned top 10 recommendations with their hybrid scores
+-   Created a user-item rating matrix for collaborative filtering, a TF-IDF matrix for content-based filtering, and an indexed book catalog for content-based similarity. This was all done to either reduce noise and prevent memory explosion (VSCode likes to crash) or to improve model stability.
 
-Although I wanted to create a hybrid system that recommends books based on metadata features and user ratings, I created all three models as to confirm that the hybrid model produced the best recommendations. 1. Content-Based Filtering (CBF): Recommends similar books based on book metadata features including title, author, and publisher. 2. Collaborating Filtering (CF): recommends books based on similarity of user rating patterns. For this model, I used Surprise’s KNNBasic model with item-based CF, cosine similarity, and full trainset fitting. 3. Hybrid Model: Hybrid systems are widely used in recommendation systems. I combined both CBF and CF models to give recommendations based on both personal taste and similarity. The model computes a similarity score from CBF and CF, then blends those scores using a parameter (alpha), which controls the balance between the two systems. I chose alpha = 0.6 so the content features have slightly more weight than rating similarities.
+-   For the content-based filter, used TF-IDF over combined text fields (`Book_Title`, `Book_Author`, and `Publisher`). Since genre was not provided, I used the publisher as most companies produce books in the same realm of genre and/or with the same target demographic in mind.
 
-Hybrid(i) = ⍺ \* Content(i) + (1 – ⍺) \* CF(i)
+-   For the collaborative filtering, used Surprise's item-item cosine similarity to add personalization in suggestions that is based on how readers rate books. Amother all the great reasons the Surprise library is normally used, it was specifically used in this project because it creates internal ID Mapping so there is no manual encoding needed and the library makes it easy to extract CF similarity vectors and blend them with content-based scores.
 
-This works best for books that do not have many ratings (the CF would be weak) and the metadata does not describe the book (the CBF would be weak). The output is a combined similarity score for every book and recommends the Top 10 strongest scores.
+-   The hybrid model computes a similarity score from both the CBF and CF, then blends those scores using a parameter (alpha), which controls the balance between the two. I chose alpha = 0.6 so the content features have slightly more weight than rating similarities.
+
+    $$
+    \text{HybridSim}(i, j)
+    = \alpha \cdot \text{ContentSim}(i, j)
+    + 1 - \alpha) \cdot \text{CFSim}(i, j)
+    $$
+
+-   If a user rated a book highly (8 -10), that encouraged recommendations with similarity patterns. If a user rated a book poorly (1-3), the model would weaken similarity's effect or avoid recommending books with strong overlap.
+
+### Testing and Evaluation
+
+-   Created a function that prints the book that a user read along with the rating given, and the top 10 recommendations based on that. The hybrid score range was around 0.30-0.60, with most scores are in the 0.4 range. For reference a score of 0.70 would be a near duplicate book and a score of 0.15 would be an unrelated book. I thought the recommendations were mostly accurate.
+
+-   There are a few limitations. The hybrid model ensures that the ISBN just rated is not included in its own recommendation list, however books can have different ISBN's if published by different companies. The book title was also slightly different in this situation. I also saw the same book recommended if there was a row for the hardcover and paperback version (different ISBNs and different titles).
+
+-   The model could be improved by adding book genres and sub-genres. Also by incorporating user-level demographic patterns like age and location. Most especially, I want the model to take into consideration book descriptions by using BERT-based embeddings for better recommendations.
 
 ## Code
 
-The full code is the “allwork.ipynb” file under the “work” folder.
+The full code is the `allwork.ipynb` file under the `work` folder.
+
+##### AI Disclosure
+
+AI was used to narrow down a list of 709 items that was eventually removed from the project. No AI was used in the final code.
 
 <details>
 
@@ -664,11 +703,3 @@ show_hybrid_recs_user(isbn, user_id, top_n=10, alpha=0.6)
 ```
 
 </details>
-
-## Discussion
-
-I consider the design of the hybrid model successfully accomplished the goal. While the system performs well will the available metadata and rating data, there are several enhancements I would add in the future. Particularly, I would like to incorporate user-level demographic patterns (age and location). I would also like to find richer datasets with more book metadata so I can use BERT-based embeddings that include book descriptions for better recommendations.
-
-#### AI Disclosure
-
-AI was used to narrow down a list of 709 items that was eventually removed from the project. No AI was used in the final code.
