@@ -1,6 +1,6 @@
 ---
-title: "Final Project Write-Up"
-subtitle: "INFO 523 - Final Project"
+title: Final Project Write-Up
+subtitle: INFO 523
 format:
    html:
     code-tools: true
@@ -13,11 +13,9 @@ execute:
 jupyter: python3
 ---
 
-# Final Project Write-Up
-
-~\*Note\ for\ peer\ review\ &\ Dr.\ Chen\ that\ the\ proposal\ template\ I\ followed\ did\ not\ include\ "asking\ a\ question".\ So,\ that\ was\ not\ part\ of\ my\ project\ goal.~
-
 ## Introduction
+
+~\*Note for peer review & Dr. Chen that the proposal template I followed did not include "asking a question". So, that was not part of my project goal.~
 
 This project develops a book recommendation system using a hybrid approach by combining content-based similarity from book metadata with collaborative filtering based on user rating patterns. Using TF-IDF text features and a KNN-based model from the Surprise library, the system generates personalized reading suggestions that overcome the limitations of using either model alone.
 
@@ -107,9 +105,7 @@ The datasets used in this project were downloaded from [Kaggle.](https://www.kag
 
 The full code is the `allwork.ipynb` file under the `work` folder.
 
-##### AI Disclosure
-
-AI was used to narrow down a list of 709 items that was eventually removed from the project. No AI was used in the final code.
+~AI\ Disclosure:\ AI\ was\ used\ to\ narrow\ down\ a\ list\ of\ 709\ items\ that\ was\ eventually\ removed\ from\ the\ project.\ No\ AI\ was\ used\ in\ the\ final\ code.~
 
 <details>
 
