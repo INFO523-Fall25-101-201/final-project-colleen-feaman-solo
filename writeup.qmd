@@ -1,15 +1,64 @@
 # Final Project Write-Up
 
 ## Introduction 
+For this project, I created a book recommendation system with a hybrid model. This write-up explains the datasets, approach, and methods used to achieve the project goal.
+
+The datasets used were found and downloaded from Kaggle.
+
+Books Dataset
+-	ISBN
+-	Book Title
+-	Book Author
+-	Publisher
+
+Ratings Dataset
+-	User ID
+-	ISBN
+-	Book Rating
 
 
-## Approach
+*Note that the proposal template I followed did not include "asking a question".
+
+## Approach and Mining Methods
+Although I wanted to create a hybrid system that recommends books based on metadata features and user ratings, I created all three models as to confirm that the hybrid model produced the best recommendations. 
+1.	Content-Based Filtering (CBF): Recommends similar books based on book metadata features including title, author, and publisher.
+2.	Collaborating Filtering (CF): recommends books based on similarity of user rating patterns. For this model, I used Surprise’s KNNBasic model with item-based CF, cosine similarity, and full trainset fitting. 
+3.	Hybrid Model: Hybrid systems are widely used in recommendation systems. I combined both CBF and CF models to give recommendations based on both personal taste and similarity. 
+The model computes a similarity score from CBF and CF, then blends those scores using a parameter (alpha), which controls the balance between the two systems. I chose alpha = 0.6 so the content features have slightly more weight than rating similarities. 
+
+Hybrid(i) = ⍺ * Content(i) + (1 – ⍺) * CF(i)
+
+This works best for books that do not have many ratings (the CF would be weak) and the metadata does not describe the book (the CBF would be weak). The output is a combined similarity score for every book and recommends the Top 10 strongest scores.
+
 
 
 ## Code
-
-
-## Mining Method
-
+The full code is the “allwork.ipynb” file under the “work” folder. Listed here is a broad overview of the code organization.
+Part 1: Data Exploration and Preprocessing
+1.	Data Loading and Cleaning
+    - Ensured consistent formatting across datasets
+    - Removed ratings set at 0 (not a rating, just a user who visited the page)
+    - Removed ISBNS that did not have metadata
+2.	EDA, Data Transformation/Reduction, and Feature Engineering
+    - Removed outliers in Year_Of_Publication 
+    - Looked at top authors and publishers
+    -Checked the distributions of ratings and users
+    - Filtered ratings to valid books
+    - Computed matrices only from books present in the ratings
+Part 2: Build the Recommendation System
+3.	Created CBF Model
+    - Combined title + author + publisher into a “text” field
+    - Tokenized using TfidVectorizer
+    - Computed cosine similarity for any selected ISBN
+4.	Created CF Model
+    - Built full trainset
+    - Used KNNBasic (item-based, cosine)
+    - Extracted neighbor ISBNs for any given book
+5.	Created Hybrid Model 
+    - Normalized similarity vectors
+    - Weighted the contributions of CBF and CF
+    - Returned top 10 recommendations with their hybrid scores
 
 ## Discussion 
+
+I consider the design of the hybrid model successfully accomplished the goal. While the system performs well will the available metadata and rating data, there are several enhancements I would add in the future. Particularly, I would like to incorporate user-level demographic patterns (age and location). I would also like to find richer datasets with more book metadata so I can use BERT-based embeddings that include book descriptions for better recommendations. 

@@ -168,9 +168,9 @@ Output
 
 ## Key Findings
 
-## Limitations 
+## Limitations
 
-## Conslusions 
+## Conslusions
 
 ## Code
 
