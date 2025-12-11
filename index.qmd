@@ -20,4 +20,4 @@ jupyter: python3
 
 ## Abstract
 
-Add project abstract here.
+This project builds a hybrid recommendation system that combines content text-based metadata and user rating patterns to generate reading suggestions.

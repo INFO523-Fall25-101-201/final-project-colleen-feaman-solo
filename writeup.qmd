@@ -62,3 +62,8 @@ Part 2: Build the Recommendation System
 ## Discussion 
 
 I consider the design of the hybrid model successfully accomplished the goal. While the system performs well will the available metadata and rating data, there are several enhancements I would add in the future. Particularly, I would like to incorporate user-level demographic patterns (age and location). I would also like to find richer datasets with more book metadata so I can use BERT-based embeddings that include book descriptions for better recommendations. 
+
+
+#### AI Disclosure
+AI was used to narrow down a list of 709 items that was eventually removed from the project.
+No AI was used in the final code.

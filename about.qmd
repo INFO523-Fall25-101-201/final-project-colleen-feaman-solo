@@ -7,6 +7,4 @@ editor: visual
 jupyter: python3
 ---
 
-This project was developed by Colleen Feaman For [INFO 523 - Data Mining and Discovery](https://datamineaz.org/) at the University of Arizona, taught by John Chen. The team is comprised of the following team members.
-
--   Colleen Feaman, currently in her second semester pursuing a Masters Degree in Data Science.
+This project was developed by Colleen Feaman For [INFO 523 - Data Mining and Discovery](https://datamineaz.org/) at the University of Arizona, taught by John Chen.
