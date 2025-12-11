@@ -14,8 +14,11 @@ website:
         href: proposal.qmd
       - text: Presentation
         href: presentation.qmd
+      - text: Write-Up
+        href: writeup.qmd  
       - text: About
         href: about.qmd
+      
 
 format:
   html:
