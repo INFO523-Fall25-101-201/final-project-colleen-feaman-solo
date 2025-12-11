@@ -5,7 +5,7 @@ author:
   - name: "Colleen Feaman"
     affiliations:
       - name: "College of Information Science, University of Arizona"
-description: "A hybrid book recommendation system that combines a content-based and collaborative filter model using publicly availble book metadata and user reading history."
+description: "A hybrid recommendation model that blends metadata-based similarity with user rating patterns to generate personalized book suggestions."
 format:
    html:
     code-tools: true
@@ -20,7 +20,9 @@ jupyter: python3
 
 ## Abstract
 
-This project builds a hybrid recommendation system that combines content text-based metadata and user rating patterns to generate reading suggestions.
+This project develops a book recommendation system using a hybrid approach by combining content-based similarity from book metadata with collaborative filtering based on user rating patterns. Using TF-IDF text features and a KNN-based model from the Surprise library, the system generates personalized reading suggestions that overcome the limitations of using either model alone.
+
+The overall goal of this project is to demonstrate how balancing metadata and reader behavior through a tunable hybrid weight (⍺) can improve recommendation accuracy.
 
 <details>
 
