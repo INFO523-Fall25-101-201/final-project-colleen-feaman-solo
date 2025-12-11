@@ -50,8 +50,8 @@ from surprise import Dataset, Reader, KNNBasic
 # ### Including: Data Retrieval, Exploratory Data Analysis (EDA), Data Cleaning, & Feature Engineering
 
 # %%
-books = pd.read_csv("data/user_data/Books.csv", low_memory=False)
-ratings = pd.read_csv("data/user_data/Ratings.csv")
+books = pd.read_csv("../data/user_data/Books.csv", low_memory=False)
+ratings = pd.read_csv("../data/user_data/Ratings.csv")
 
 # %%
 books.head()
@@ -117,6 +117,37 @@ books[books['Publisher'].isna()]
 #Also dropping those two rows because they do not matter
 
 books = books.dropna(subset=["Publisher"])
+
+# %%
+#Removing books published by known foreign-language publishers
+#Produce books in langauges I do not understand, so excluding them ensures the results remain interpretable
+
+before = books.shape[0]
+
+foreign_publishers = [
+    "Goldmann",
+    "Heyne",
+    "Gallimard",
+    "LÃ?Â¼bbe",
+    "Distribooks",
+    "Eichborn",
+    "Diogenes Verlag",
+    "Carlsen Verlag GmbH"
+]
+
+books = books[
+    ~books['Publisher'].str.contains("|".join(foreign_publishers),case = False, na = False)
+]
+
+after = books.shape[0]
+
+print(f"Rows removed: {before-after}")
+
+# %%
+#Removing Scholastic publisher since that is kids books
+
+books = books[
+    ~books['Publisher'].str.contains("Scholastic", case=False, na=False)]
 
 # %%
 books.info()
@@ -220,16 +251,15 @@ ratings['User_ID'].value_counts().head(10)
 
 ratings['ISBN'].value_counts().describe()
 
-#While 707 ratings for one book is an outlier, it is not an error
+#Outliers exist but it is not an error
 #More popular books will have more rating
 
 # %%
 #Checking that all ISBNs in the ratings data also exists in the books data
 
 missing_books = ~ratings['ISBN'].isin(books['ISBN'])
-missing_books.sum()
+print(f"Books rated that are not in Books Data:", missing_books.sum())
 
-#55,643 ratings reference ISBNs that are not in the books data
 #This a problem for when I merge the data, as the ISBNs not in the books data will not have any metadata
 
 # %%
@@ -307,7 +337,7 @@ print("sparsity:", 1 - (user_item_sparse_f.count_nonzero()/ np.prod(user_item_sp
 # %%
 #Build an indexed version of books
 
-isbn_filt = ratings_filt['ISBN'].unique()
+isbn_categories = ratings_filt['ISBN'].unique()
 
 books_indexed = books.drop_duplicates('ISBN').set_index('ISBN')
 
@@ -317,17 +347,17 @@ books_indexed.head()
 #Select only books used in ratings
 #Return ISBN as a column
 
-books_for_model = books_indexed.loc[isbn_categories].reset_index().rename(columns={'index':'ISBN'})
+books_for_model = books_indexed.loc[books_indexed.index.isin(isbn_categories)].reset_index().rename(columns={'index':'ISBN'})
 
 books_for_model['Book_Title'] = books_for_model['Book_Title'].fillna('')
 books_for_model['Book_Author'] = books_for_model['Book_Author'].fillna('')
 books_for_model['Publisher'] = books_for_model['Publisher'].fillna('')
 
 books_for_model['text'] =(
-    books_for_model['Book_Title'] +''+
-    books_for_model['Book_Author'] +''+
-    books_for_model['Publisher']
-)
+    books_for_model['Book_Title'].fillna('') +''+
+    books_for_model['Book_Author'].fillna('') +''+
+    books_for_model['Publisher'].fillna('')
+).str.lower()
 
 books_for_model[['ISBN', 'text']].head()
 
@@ -336,7 +366,7 @@ books_for_model[['ISBN', 'text']].head()
 #Limiting vocab size to prevent memory explosion
 
 tfidf = TfidfVectorizer(
-    max_features=20000,
+    max_features=50000,
     stop_words='english',
     ngram_range=(1,2),
     min_df=2,
@@ -348,7 +378,7 @@ tfidf_matrix = tfidf.fit_transform(books_for_model['text'])
 tfidf_matrix.shape
 
 # %% [markdown]
-# ## Part 2: Built the Recommendation System
+# ## Part 2: Build the Recommendation System
 
 # %% [markdown]
 # #### Build the Content-Based Recommender
@@ -384,7 +414,7 @@ def recommend_content(isbn, top_n=10):
     
     similar_idx = sims.argsort()[::-1][1:top_n+1]
     
-    results = books_for_model.iloc[similar_idx][['ISBN', 'Book_Title', 'Book_Author']].copy()
+    results = books_for_model.iloc[similar_idx][['ISBN', 'Book_Title', 'Book_Author', 'Publisher']].copy()
 
     results['similarity'] = sims[similar_idx]
     
@@ -448,7 +478,7 @@ def recommend_cf(isbn, top_n =10):
 
     neighbor_isbns = [trainset.to_raw_iid(n) for n in neighbors_inner]
 
-    recs = books_indexed.loc[neighbor_isbns][['Book_Title', 'Book_Author']].copy()
+    recs = books_indexed.loc[neighbor_isbns][['Book_Title', 'Book_Author', 'Publisher']].copy()
     recs = recs.reset_index().rename(columns={'index': 'ISBN'})
    
     return recs
@@ -508,40 +538,81 @@ def get_cf_similarities(isbn, top_k=50):
             idx = isbn_to_index[raw_isbn]
             sim_vector[idx] = sim
 
+    if sim_vector.max() > sim_vector.min():
+        sim_vector= (sim_vector -sim_vector.min() / (sim_vector.max() - sim_vector.min()))
+
     return sim_vector
 
 # %%
 #Hybrid Function
+#Also removes books the reader already rated (they read the book)
 
-def recommend_hybrid(isbn, top_n=10, alpha=0.6):
+def recommend_hybrid_user(isbn, user_id, top_n=10, alpha=0.6):
     content_sims = get_content_similarities(isbn)
     cf_sims = get_cf_similarities(isbn)
-
-    if content_sims is None and cf_sims is None:
-        return f"{isbn} has no similarity data"
     
-    if content_sims is None:
-        content_sims = np.zeros(len(books_for_model))
-    if cf_sims is None:
-        cf_sims = np.zeros(len(books_for_model))
+    content_norm = content_sims / (content_sims.max() + 1e-6)
+    cf_norm = cf_sims / (cf_sims.max() + 1e-6)
 
-    hybrid_sims = alpha * content_sims + (1- alpha) * cf_sims
+    hybrid_sims = alpha * content_norm + (1- alpha) * cf_norm
+    
+    hybrid_sims[isbn_to_index[isbn]] =0 
 
-    if isbn in isbn_to_index.index:
-        hybrid_sims[isbn_to_index[isbn]] = 0
+    user_rated = ratings_filt.loc[ratings_filt['User_ID'] == user_id, 'ISBN']
+    user_rated_idx = isbn_to_index[user_rated.dropna()].values
+    hybrid_sims[user_rated_idx] = 0
 
-    top_idx = hybrid_sims.argsort()[::-1][1: top_n +1]
+    top_idx = hybrid_sims.argsort()[::-1][:top_n]
 
-    results = books_for_model.iloc[top_idx][['ISBN', 'Book_Title', 'Book_Author']].copy()
+    results = books_for_model.iloc[top_idx][['ISBN', 'Book_Title', 'Book_Author', 'Publisher']].copy()
     results['hybrid_score'] = hybrid_sims[top_idx]
 
     return results.reset_index(drop=True)
 
 # %%
+#Funtion that displays recs nicely
+
+def show_hybrid_recs_user(isbn, user_id, top_n=10, alpha=0.6):
+    book = books_for_model.loc[books_for_model['ISBN'] ==isbn].iloc[0]
+
+    print("Book Read:")
+    print(f"Title: {book['Book_Title']}")
+    print(f"Author: {book['Book_Author']}")
+
+    r = ratings_filt[
+        (ratings_filt['ISBN'] == isbn) &
+        (ratings_filt['User_ID'] == user_id)
+        ].iloc[0]['Book_Rating']
+    
+    print(f"User Rating: {r}\n")
+
+    print("\nTop 10 Recommendations:")
+    recs = recommend_hybrid_user(isbn, user_id, top_n=top_n, alpha=alpha)
+    display(recs)
+
+# %%
 #Test the hybrid model
 
-sample_isbn = ratings_filt['ISBN'].iloc[0]
-recommend_hybrid(sample_isbn, top_n=10, alpha=0.6)
+#Pick a book a user read and rated
+
+row = ratings_filt.sample(1).iloc[0]
+user_id = row['User_ID']
+isbn = row['ISBN']
+user_rating = row['Book_Rating']
+
+show_hybrid_recs_user(isbn, user_id, top_n=10, alpha=0.6)
+
+# %%
+#Double check 
+
+#Pick a book a user read and rated
+
+row = ratings_filt.sample(1).iloc[0]
+user_id = row['User_ID']
+isbn = row['ISBN']
+user_rating = row['Book_Rating']
+
+show_hybrid_recs_user(isbn, user_id, top_n=10, alpha=0.6)
 ```
 
 </details>
