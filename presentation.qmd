@@ -1,7 +1,7 @@
 ---
-title: "Project title"
-subtitle: "INFO 523 - Summer 2025 - Final Project"
-author: "Author names"
+title: "Book Recommendation System"
+subtitle: "INFO 523 - Fall 2025 - Final Project"
+author: "Colleen Feaman"
 title-slide-attributes:
   data-background-image: images/watercolour_sys02_img34_teacup-ocean.jpg
   data-background-size: stretch
@@ -45,123 +45,138 @@ plt.rcParams['figure.figsize'] = (6, 6 * 0.618)
 #| label: load-data
 #| include: false
 # Load data in Python
-mtcars = sns.load_dataset('mpg').dropna()  # mtcars dataset is similar to the mpg dataset from seaborn
-mtcars['speed'] = mtcars['horsepower'] / mtcars['weight']
-
-penguins = sns.load_dataset('penguins').dropna()
+books = pd.read_csv("data/user_data/Books.csv", low_memory=False)
+ratings = pd.read_csv("data/user_data/Ratings.csv")
 ```
 
-# Using Quarto for presentations
+## Project Overview
 
-## Quarto
+Build a hybrid book recommendation system that combines:
 
--   The presentation is created using the Quarto CLI
+-   Content-Based Filtering (TF_IDF): book metadata
 
--   `##` sets the start of a new slide
+-   Collaborative Filtering (item-based KNN): user rating patterns
 
-## Layouts
+= Hybrid score
 
-You can use plain text
+# Data Sources
 
-::: columns
-::: {.column width="40%"}
--   or bullet points[^1]
-:::
+## Books.csv
 
-::: {.column width="60%"}
-or in two columns
-:::
-:::
+ISBN
 
-[^1]: And add footnotes
+Book-Title
 
--   like
+Book-Author
 
--   this
+Year-Of-Publication
 
-## Code
+Publisher
 
-```{python}
-from sklearn.linear_model import LinearRegression
-import statsmodels.api as sm
-import pandas as pd
+Image-URL-S
 
-# Fit a linear regression model
-X = mtcars[['speed']]
-y = mtcars['mpg']
-model = LinearRegression().fit(X, y)
+Image-URL-M
 
-# Summary of the model
-X2 = sm.add_constant(X)
-est = sm.OLS(y, X2)
-est2 = est.fit()
-print(est2.summary())
-```
+Image-URL-L
 
-## Plots
+## Ratings.csv
 
-```{python}
-penguins['species'] = penguins['species'].apply(lambda x: "Adelie" if x == "Adelie" else "Other")
-sns.scatterplot(data=penguins, x='flipper_length_mm', y='body_mass_g', hue='species')
-plt.show()
-```
+-   User-ID
 
-## Plot and text
+-   ISBN
 
-::: columns
-::: {.column width="50%"}
--   Some text
+-   Book-Rating
 
--   goes here
-:::
+# Approach and Mining Methods
 
-::: {.column width="50%"}
-```{python}
-#| warning: false
-#| fig.width: 5.5
-fig, ax = plt.subplots(figsize=(5.5, 5.5 * 0.618))
-sns.boxplot(data=penguins, x='bill_length_mm', y='species', hue='species', ax=ax)
-plt.show()
-```
-:::
-:::
+## Data Cleaning
 
-# A new section...
+-   Standardized column names for both datasets
 
-## Tables
+-   Normalized text fields for TF-IDF tokenization
 
-If you want to generate a table, make sure it is in the HTML format (instead of Markdown or other formats), e.g.,
+    -   "harry potter" vs. "Harry Potter".
 
-```{python}
-penguins.head().to_html()
-```
+-   Removed in Ratings.csv
 
-## Images
+    -   Ratings set at 0
 
-![Image credit: Danielle Navarro, Percolate.](images/watercolour_sys02_img34_teacup-ocean.png){fig-align="center" width="500"}
+## Data Cleaning cont.
 
-## Math Expressions {.smaller}
+-   Removed in Books.csv:
 
-You can write LaTeX math expressions inside a pair of dollar signs, e.g. \$\\alpha+\\beta\$ renders $\alpha + \beta$. You can use the display style with double dollar signs:
+    -   Invalid publication years
 
-```         
-$$\bar{X}=\frac{1}{n}\sum_{i=1}^nX_i$$
-```
+    -   Rows with missing values for Book_Author and Publisher
+
+    -   Books published by Scholastic or Random House Books for Young Readers
+
+    -   Known foreign-language publishers
+
+## EDA
+
+-   Removed outliers in Year_Of_Publication
+
+-   Outliers in ratings per user and ratings per book
+
+-   Removed ISBNs with no metadata
+
+-   Merged Books.csv and Ratings.csv by User_ID
+
+-   Filtered out books \< 5 ratings and users \< 5 ratings
+
+## Modeling Decisions
+
+Content-based filtering:
+
+-   TF-IDF matrix
+
+-   Indexed book catalog
+
+-   Combined Book_Title, Book_Author, and Publisher
+
+Collaborative filtering:
+
+-   User-item rating matrix
+
+-   Surprise's item-item cosine similarity
+
+## Modeling Decisions cont.
+
+Hybrid:
+
+-   Similarity score from both the CBF and CF
 
 $$
-\bar{X}=\frac{1}{n}\sum_{i=1}^nX_i
+\text{HybridSim}(i, j)
+= \alpha \cdot \text{ContentSim}(i, j)
++ 1 - \alpha) \cdot \text{CFSim}(i, j)
 $$
 
-Limitations:
+## Evaluation
 
-1.  The source code of a LaTeX math expression must be in one line, unless it is inside a pair of double dollar signs, in which case the starting `$$` must appear in the very beginning of a line, followed immediately by a non-space character, and the ending `$$` must be at the end of a line, led by a non-space character;
+![](images/good example 2.png)
 
-2.  There should not be spaces after the opening `$` or before the closing `$`.
+## Evaluation cont.
 
-# Wrap up
+![](images/good example.png)
 
-## Feeling adventurous?
+## Evaluation cont.
 
--   You are welcomed to use the default styling of the slides. In fact, that's what I expect majority of you will do. You will differentiate yourself with the content of your presentation.
+![](images/good example 4.png)
 
--   But some of you might want to play around with slide styling. Some solutions for this can be found at https://quarto.org/docs/presentations/revealjs.
+## Evaluation cont.
+
+![](images/different book title.png)
+
+## Limitations & Future Work
+
+-   Different ISBN's, same book
+
+-   Hardcover vs. paperback version
+
+-   Add book genres and sub-genres
+
+-   User-level demographic patterns
+
+-   Book descriptions
